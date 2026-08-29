@@ -1,0 +1,330 @@
+; ================================================================
+; float myfsqrt(float f)  -  pierwiastek kwadratowy bez FPU/SSE-math
+;
+; Wersja zapasowa: Newton-Raphson + soft-float (sf_div/sf_add/sf_halve)
+;
+; Wszystkie operacje arytmetyczne na float (dzielenie, dodawanie,
+; polowienie) realizowane recznie na bitach IEEE 754 w rejestrach
+; calkowitych - bez addss/divss/mulss/sqrtss ani instrukcji x87.
+;
+; ABI 32-bit (cdecl):
+; ================================================================
+
+global myfsqrt
+section .text
+
+; ----------------------------------------------------------------
+; sf_div - dzieli EAX = EAX / EBX
+;   zaokragla wynik (round-to-nearest-even) zeby blad byl maly
+;   psuje: EAX EBX ECX EDX ESI EDI
+; ----------------------------------------------------------------
+sf_div:
+    ; --- ustalam znak wyniku ---
+    mov  ecx, eax
+    xor  ecx, ebx
+    and  ecx, 0x80000000      ; ECX = sam bit znaku wyniku
+    push ecx                  ; chowamy na stos, bo ECX zaraz potrzebny
+
+    ; --- ustalam wykladnik wyniku ---
+    ; potem dodajem (bias IEEE) bo odejmowanie kasuje
+    mov  ecx, eax
+    shr  ecx, 23
+    and  ecx, 0xFF            ; ECX = wykladnik dzielnej (ea)
+    mov  esi, ebx
+    shr  esi, 23
+    and  esi, 0xFF            ; ESI = wykladnik dzielnika (eb)
+    sub  ecx, esi             ; ea - eb
+    add  ecx, 127             ; ECX = wykladnik wyniku (jeszcze poprawimy)
+
+    ; --- wyciagnij mantysy i dokleje recznie 1 na 23b ---
+    and  eax, 0x7FFFFF
+    or   eax, 0x800000        ; EAX = mantysa dzielnej (24 bity)
+    and  ebx, 0x7FFFFF
+    or   ebx, 0x800000        ; EBX = mantysa dzielnika (24 bity)
+
+    ; --- podziel mantysy ---
+    ; mantysa/mantysa za malo b przy dzieleniu
+    ; dlatego przesuwamy w lewo dzielna do 26 (24man + 3 dodatkowe do zaokraglania)
+    ; 24+26 = 50 wiec para EDX:EAX
+    mov  edx, eax
+    shr  edx, 6               ; EDX = gorne bity (ma >> 6)
+    shl  eax, 26              ; EAX = dolne bity (ma << 26)
+    div  ebx
+                              ; EAX = wyn, EDX = reszta
+
+    ; --- sticky bit: cos sie urwalo na dziel ---
+    ; reszta != 0, wynik niedokladny
+    xor  esi, esi
+    test edx, edx
+    jz   .div_nosticky
+    mov  esi, 1               ; ESI = 1 jesli reszta niezerowa
+.div_nosticky:
+
+    ; --- normalizacja: jedynka na ok pozycji (26b) ---
+    test eax, (1 << 26)
+    jnz  .div_ge1
+    shl  eax, 1               ; iloraz < 1 -> przesun, zmniejsz wykladnik
+    dec  ecx
+.div_ge1:
+    ; [bit26 = ukryta 1][23 bity mantysy][guard][round][sticky]
+
+    ; --- wyciagnij bity pomocnicze do zaokraglania ---
+    mov  edx, eax
+    and  edx, 1
+    or   esi, edx             ; ESI = sticky
+    shr  eax, 1
+    mov  edx, eax
+    and  edx, 1               ; EDX = round
+    shr  eax, 1
+    mov  edi, eax
+    and  edi, 1               ; EDI = guard
+    shr  eax, 1               ; EAX = mantysa
+    and  eax, 0xFFFFFF
+
+    ; --- zaokraglanie do 2n ---
+
+    test edi, edi
+    jz   .div_noround
+    or   edx, esi
+    mov  edi, eax
+    and  edi, 1
+    or   edx, edi
+    jz   .div_noround
+    inc  eax                  ; zaokraglanie
+    test eax, 0x1000000       ; przepelnenei 25 bitow?
+    jz   .div_noround
+    shr  eax, 1               ; przesun i zwiekz wykladnik
+    inc  ecx
+.div_noround:
+    ; --- zloz wynik z powrotem w jeden float ---
+    pop  esi                  ; znak
+    test ecx, ecx
+    jle  .div_underflow       ; wykladnik <= 0
+    cmp  ecx, 255
+    jge  .div_overflow
+    shl  ecx, 23
+    and  eax, 0x7FFFFF        ; wytnij 1
+    or   eax, ecx
+    or   eax, esi
+    ret
+.div_underflow:
+    mov  eax, esi             ; wynik = +/-0 (sam znak)
+    ret
+.div_overflow:
+    mov  eax, 0x7F800000      ; +/-inf
+    or   eax, esi
+    ret
+
+
+; ----------------------------------------------------------------
+; sf_add - EAX = EAX + EBX (oba podane jako bity)
+;   psuje: EAX EBX ECX EDX ESI EDI
+; ----------------------------------------------------------------
+sf_add:
+    ; --- wyciagam wykladniki ---
+    mov  ecx, eax
+    shr  ecx, 23
+    and  ecx, 0xFF            ; ECX = wykladnik a (ea)
+    mov  esi, ebx
+    shr  esi, 23
+    and  esi, 0xFF            ; ESI = wykladnik b (eb)
+
+    ; --- wyciagnij mantysy z jedynka i 3 dodat bit g,r,s---
+    and  eax, 0x7FFFFF
+    or   eax, 0x800000
+    shl  eax, 3               ; EAX = mantysa a (z zapasem na zaokraglanie)
+    and  ebx, 0x7FFFFF
+    or   ebx, 0x800000
+    shl  ebx, 3               ; EBX = mantysa b
+
+    ; --- wyrownoje wykladniki ---
+    cmp  ecx, esi
+    jae  .add_a_ge
+    mov  edx, ecx
+    mov  ecx, esi             ; CL = eb
+    sub  ecx, edx             ; CL = eb - ea (o ile przesunac)
+    shr  eax, cl
+    mov  ecx, esi             ; ECX = wykladnik wyn
+    jmp  .add_aligned
+.add_a_ge:
+    mov  edx, ecx
+    sub  ecx, esi
+    shr  ebx, cl
+    mov  ecx, edx
+.add_aligned:
+    ; --- dodawanie mantysy ---
+    add  eax, ebx             ; EAX = suma mantys
+
+    ; ---czy overflow o bit? ---
+    test eax, (1 << 27)
+    jz   .add_nocarry
+    mov  edx, eax
+    and  edx, 1               ; zapamietaj sticky
+    shr  eax, 1
+    or   eax, edx             ; wrzucic sticky
+    inc  ecx
+.add_nocarry:
+
+    ; --- wyciagnij dolne 3 bity---
+    mov  edi, eax
+    shr  edi, 2
+    and  edi, 1               ; EDI = guard
+    mov  esi, eax
+    shr  esi, 1
+    and  esi, 1               ; ESI = round
+    mov  edx, eax
+    and  edx, 1               ; EDX = sticky
+    shr  eax, 3
+    and  eax, 0xFFFFFF        ; EAX = mantysa (24b)
+
+    ; --- zaokraglanie tak samo jak w sf_div ---
+    test edi, edi             ; guard = 0?
+    jz   .add_noround
+    or   esi, edx
+    mov  edi, eax
+    and  edi, 1
+    or   esi, edi
+    jz   .add_noround
+    inc  eax
+    test eax, 0x1000000
+    jz   .add_noround
+    shr  eax, 1
+    inc  ecx
+.add_noround:
+    ; --- zloz wynik ---
+    cmp  ecx, 255
+    jge  .add_overflow
+    shl  ecx, 23
+    and  eax, 0x7FFFFF
+    or   eax, ecx
+    ret
+.add_overflow:
+    mov  eax, 0x7F800000      ; nieskonczonosc
+    ret
+
+
+; ----------------------------------------------------------------
+; sf_halve - dzieli float przez 2:  EAX = EAX / 2
+;   psuje: EAX ECX EDX
+; ----------------------------------------------------------------
+sf_halve:
+    ; --- wyciagnij wykladnik ---
+    mov  ecx, eax
+    shr  ecx, 23
+    and  ecx, 0xFF            ; ECX = wykladnik
+    cmp  ecx, 1
+    jle  .halve_denorm        ; wykladnik <= 1 -> denormal
+    sub  eax, (1 << 23)
+    ret
+.halve_denorm:
+    ; mantyse przez 2
+    mov  edx, eax
+    and  edx, 0x7FFFFF        ; EDX = mantysa be 1
+    test ecx, ecx
+    jz   .halve_nohidden
+    or   edx, 0x800000
+.halve_nohidden:
+    shr  edx, 1               ; mantysa / 2
+    and  eax, 0x80000000      ; w EAX zostaw sam znak
+    or   eax, edx             ; doklej mantyse
+    ret
+
+
+; ================================================================
+; myfsqrt - funkcja glowna
+;   1. sprawdza przypadki specjalne (NaN, inf, zero, ujemne, denormal)
+;   2. liczy przyblizenie startowe "bit hackiem"
+;   3. poprawia je 4 razy metoda Newtona-Raphsona
+;   4. zwraca wynik
+; x[n+1] = 0.5*(x[n] + f/x[n])
+;
+; Zmienne lokalne na stosie (x32 ma malo rejestrow):
+;   [ebp-4]  = f (znormalizowane)
+;   [ebp-8]  = x (biezace przyblizenie)
+;   [ebp-12] = scale (korekta dla denormala: 24<<23 lub 0)
+; W myfsqrt uzywamy tylko EAX/EBX/ECX/EDX (+ EBP); EBX zapisujemy raz.
+; ================================================================
+myfsqrt:
+    push ebp
+    mov  ebp, esp
+    sub  esp, 12
+    push ebx
+
+    mov  eax, [ebp+8]         ; EAX = bity f
+
+    ; --- sprawdzam czy to nic specjalnego ---
+    mov  edx, eax
+    and  edx, 0x7FFFFFFF      ; EDX = wartosc bezwzledna
+    mov  ecx, edx
+    shr  ecx, 23              ; ECX = wykladnik
+
+    cmp  ecx, 0xFF
+    jne  .cls_notspecial
+    ; wykladnik = 255 -> NaN albo nieskonczonosc
+    and  edx, 0x7FFFFF
+    jnz  .ret_eax             ; mantysa != 0 -> NaN -> zwroc bez zmian
+    test eax, eax
+    jns  .ret_eax             ; +inf -> sqrt(+inf) = +inf
+    mov  eax, 0x7FC00000      ; -inf -> NaN
+    jmp  .done
+.cls_notspecial:
+    test edx, edx
+    jz   .ret_eax             ; liczba == 0 -> 0
+    test eax, eax
+    js   .ret_qnan            ; liczba ujemna -> NaN
+
+    ; --- denormal? skaluj w gore, na koniec odejmij scale od wykl wyniku ---
+    mov  dword [ebp-12], 0
+    test ecx, ecx
+    jnz  .have_normal
+
+    and  edx, 0x7FFFFF        ; EDX = mantysa
+    mov  ecx, 49              ; wykladnik startowy (1 + 48 ze skalowania)
+.dn_loop:
+    shl  edx, 1
+    dec  ecx
+    test edx, 0x800000
+    jz   .dn_loop
+    and  edx, 0x7FFFFF
+    mov  eax, ecx
+    shl  eax, 23
+    or   eax, edx             ; f * 2^48
+    mov  dword [ebp-12], 24 << 23
+.have_normal:
+    mov  [ebp-4], eax         ; f
+
+    ; --- bit hack: x0 ~= sqrt(f) ---
+    mov  edx, eax
+    shr  edx, 1
+    add  edx, 0x1FBB4000
+    mov  [ebp-8], edx         ; x0
+
+    ; --- 4x Newton-Raphson: x = (x + f/x) / 2 ---
+%rep 4
+    mov  eax, [ebp-4]
+    mov  ebx, [ebp-8]
+    call sf_div               ; t = f / x
+    mov  ebx, eax
+    mov  eax, [ebp-8]
+    call sf_add               ; s = x + t
+    call sf_halve             ; x = s / 2
+    mov  [ebp-8], eax
+%endrep
+
+    mov  eax, [ebp-8]
+    sub  eax, [ebp-12]        ; odskalowanie denormala
+    jmp  .done
+
+.ret_qnan:
+    mov  eax, 0x7FC00000
+.ret_eax:
+.done:
+    mov  [ebp-4], eax
+    fld  dword [ebp-4]
+    pop  ebx
+    mov  esp, ebp
+    pop  ebp
+    ret
+
+; Oznacz stos jako niewykonywalny (usuwa ostrzezenie linkera)
+section .note.GNU-stack noalloc noexec nowrite progbits
