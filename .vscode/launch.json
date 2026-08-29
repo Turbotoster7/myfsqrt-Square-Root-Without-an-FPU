@@ -1,0 +1,209 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "x32 — myfsqrt (rejestry BINARNIE)",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/x32_version/program",
+            "args": ["${input:sqrtArg}"],
+            "cwd": "${workspaceFolder}/x32_version",
+            "preLaunchTask": "make x32",
+            "MIMode": "gdb",
+            "miDebuggerPath": "/usr/bin/gdb",
+            "setupCommands": [
+                {
+                    "text": "set debuginfod enabled off",
+                    "ignoreFailures": true
+                },
+                {
+                    "text": "set architecture i386",
+                    "ignoreFailures": true
+                },
+                {
+                    "text": "set output-radix 16",
+                    "description": "hex domyslnie (IEEE float); binarnie: b32 $eax lub print/t"
+                },
+                {
+                    "text": "source ${workspaceFolder}/x32_version/gdb-myfsqrt.gdb",
+                    "ignoreFailures": true
+                },
+                {
+                    "text": "set disassemble-next-line on",
+                    "ignoreFailures": true
+                },
+                {
+                    "text": "break myfsqrt"
+                }
+            ]
+        },
+        {
+            "name": "x32 — start w myfsqrt (bez breakpointow)",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/x32_version/program",
+            "args": ["${input:sqrtArg}"],
+            "cwd": "${workspaceFolder}/x32_version",
+            "preLaunchTask": "make x32",
+            "MIMode": "gdb",
+            "miDebuggerPath": "/usr/bin/gdb",
+            "stopAtEntry": false,
+            "externalConsole": false,
+            "setupCommands": [
+                {
+                    "text": "set debuginfod enabled off",
+                    "ignoreFailures": true
+                },
+                {
+                    "text": "set architecture i386",
+                    "ignoreFailures": true
+                },
+                {
+                    "text": "set disassemble-next-line on",
+                    "ignoreFailures": true
+                },
+                {
+                    "text": "break myfsqrt",
+                    "description": "Auto-stop na poczatku myfsqrt"
+                }
+            ]
+        },
+        {
+            "name": "x64 — start w myfsqrt (bez breakpointow)",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/x64_version/program",
+            "args": ["${input:sqrtArg}"],
+            "cwd": "${workspaceFolder}/x64_version",
+            "preLaunchTask": "make x64",
+            "MIMode": "gdb",
+            "miDebuggerPath": "/usr/bin/gdb",
+            "setupCommands": [
+                {
+                    "text": "set debuginfod enabled off",
+                    "ignoreFailures": true
+                },
+                {
+                    "text": "set disassemble-next-line on",
+                    "ignoreFailures": true
+                },
+                {
+                    "text": "break myfsqrt",
+                    "description": "Auto-stop na poczatku myfsqrt"
+                }
+            ]
+        },
+        {
+            "name": "Debug x32 myfsqrt (program)",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/x32_version/program",
+            "args": ["${input:sqrtArg}"],
+            "cwd": "${workspaceFolder}/x32_version",
+            "preLaunchTask": "make x32",
+            "MIMode": "gdb",
+            "miDebuggerPath": "/usr/bin/gdb",
+            "stopAtEntry": false,
+            "externalConsole": false,
+            "setupCommands": [
+                {
+                    "text": "set debuginfod enabled off",
+                    "ignoreFailures": true
+                },
+                {
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                },
+                {
+                    "text": "set architecture i386",
+                    "ignoreFailures": true
+                },
+                {
+                    "text": "set disassemble-next-line on",
+                    "ignoreFailures": true
+                }
+            ],
+            "logging": {
+                "moduleLoad": false,
+                "trace": false,
+                "engineLogging": false
+            }
+        },
+        {
+            "name": "Debug x64 myfsqrt (program)",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/x64_version/program",
+            "args": ["${input:sqrtArg}"],
+            "cwd": "${workspaceFolder}/x64_version",
+            "preLaunchTask": "make x64",
+            "MIMode": "gdb",
+            "miDebuggerPath": "/usr/bin/gdb",
+            "stopAtEntry": false,
+            "externalConsole": false,
+            "setupCommands": [
+                {
+                    "text": "set debuginfod enabled off",
+                    "ignoreFailures": true
+                },
+                {
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                },
+                {
+                    "text": "set disassemble-next-line on",
+                    "ignoreFailures": true
+                }
+            ],
+            "logging": {
+                "moduleLoad": false,
+                "trace": false,
+                "engineLogging": false
+            }
+        },
+        {
+            "name": "Debug x32 myfsqrt (runtest)",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/x32_version/runtest",
+            "cwd": "${workspaceFolder}/x32_version",
+            "preLaunchTask": "make x32 test",
+            "MIMode": "gdb",
+            "miDebuggerPath": "/usr/bin/gdb",
+            "setupCommands": [
+                {
+                    "text": "set debuginfod enabled off",
+                    "ignoreFailures": true
+                },
+                {
+                    "text": "set architecture i386",
+                    "ignoreFailures": true
+                }
+            ]
+        },
+        {
+            "name": "Debug x64 myfsqrt (runtest)",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/x64_version/runtest",
+            "cwd": "${workspaceFolder}/x64_version",
+            "preLaunchTask": "make x64 test",
+            "MIMode": "gdb",
+            "miDebuggerPath": "/usr/bin/gdb",
+            "setupCommands": [
+                {
+                    "text": "set debuginfod enabled off",
+                    "ignoreFailures": true
+                }
+            ]
+        }
+    ],
+    "inputs": [
+        {
+            "id": "sqrtArg",
+            "type": "promptString",
+            "description": "Argument dla myfsqrt (np. 9, 2, 1e-38)",
+            "default": "9"
+        }
+    ]
+}

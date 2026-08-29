@@ -1,0 +1,10 @@
+{
+    "debug.allowBreakpointsEverywhere": true,
+    "debug.onTaskErrors": "showErrors",
+    "files.associations": {
+        "*.s": "asm"
+    },
+    "[asm]": {
+        "editor.tabSize": 4
+    }
+}

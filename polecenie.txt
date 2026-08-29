@@ -1,0 +1,32 @@
+rojekt wykonywany w domu, oddawany w czasie sesji laboratoryjnych.
+Napisać program działający pod kontrolą systemu Linux, składający się z głównego modułu
+w języku ANSI C, zapewniającego wejście i wyjście oraz modułu asemblerowego realizującego
+przetwarzanie danych. Treść zadania zawiera deklarację funkcji asemblerowej widzianą na
+poziomie języka C. Do asemblacji używamy asemblera NASM (nasm.us). Kompilacja i konsolidacja
+następuje przy użyciu drivera kompilatora CC.
+Przykładowe projekty wraz z Makefile i plikami konfiguracji VSCode można znaleźć
+w https://github.com/gbm-ii/x86-cc-nasm.
+Projekt powinien być przygotowany w dwóch wersjach – 32- i 64-bitowej. Z uwagi na dostępność
+większej liczby rejestrów wersja 64-bitowa powinna korzystać z mniejszej liczby zmiennych
+na stosie w pamięci. Ocena za jedną (dowolną) wersję – 6 punktów, za drugą – 2 punkty.
+Argumenty dla programu powinny być zadawane w linii polecenia, w celu ułatwienia testowania.
+Moduł asemblerowy nie powinien wywoływać funkcji z biblioteki języka C. Argumenty dla
+procedur operujących na bitach powinny być zadawane przez użytkownika w postaci
+szesnastkowej. Procedury przetwarzające obrazy w formacie .BMP mogą otrzymywać jako
+argument wskaźnik na bufor zawierający cały plik albo wskaźnik na samą strukturę obrazu
+i informację o jego rozmiarach w postaci dwóch argumentów całkowitoliczbowych. Jeśli nie
+zaznaczono inaczej, procedura powinna poprawnie przetwarzać obraz o dowolnych rozmiarach.
+Należy unikać sekwencji skoków, zwłaszcza skoków bezwarunkowych następujących bezpośrednio
+po skokach warunkowych. Próba oddania projektu jawnie niezgodnego konwencję wołania
+powoduje stratę jednego punktu.
+Procedura asemblerowa powinna korzystać głównie z rejestrów procesora, ew. ze zmiennych
+lokalnych na stosie jeśli liczba rejestrów jest niewystarczająca.
+Wersja 64-bitowa powinna używać 32-bitowych danych liczbowych (o ile z treści zadania nie
+wynika konieczność użycia danych dłuższych), jedynie operacje na adresach są 64 bitowe. Należy
+zwrócić uwagę na to, że operacje 32-bitowe w x86_64 dają wynik 64-bitowy rozszerzony zerami.
+Przyporządkowanie projektów zgodnie z pozycjami na załączonej wyżej liście studentów
+
+
+float myfsqrt(float f);
+Obliczenie pierwiastka kwadratowego liczby zmiennopozycyjnej bez użycia jednostki
+zmiennopozycyjnej ani wektorowej. Można użyć np. szeregu Newtona-Raphsona
